@@ -3,41 +3,54 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import pandas as pd
 import re
+import random
 from nltk.stem import SnowballStemmer
 
-st.title("Demo de TF-IDF con Preguntas y Respuestas")
+st.set_page_config(page_title="TF-IDF con Humor 😄", layout="centered")
+
+st.title("💬 Demo de TF-IDF con Humor y Memoria")
 
 st.write("""
-Cada línea se trata como un **documento** (puede ser una frase, un párrafo o un texto más largo).  
-⚠️ Los documentos y las preguntas deben estar en **inglés**, ya que el análisis está configurado para ese idioma.  
-
-La aplicación aplica normalización y *stemming* para que palabras como *playing* y *play* se consideren equivalentes.
+Esta app analiza tus documentos en inglés con **TF-IDF** y responde preguntas según la similitud de texto.  
+Además, crea **frases humorísticas** para ayudarte a **recordar las palabras clave**.  
 """)
 
-# Ejemplo inicial en inglés
+# 📚 Documentos de ejemplo
 text_input = st.text_area(
-    "Escribe tus documentos (uno por línea, en inglés):",
+    "📄 Escribe tus documentos (uno por línea, en inglés):",
     "The dog barks loudly.\nThe cat meows at night.\nThe dog and the cat play together."
 )
 
-question = st.text_input("Escribe una pregunta (en inglés):", "Who is playing?")
+question = st.text_input("❓ Escribe una pregunta (en inglés):", "Who is playing?")
 
-# Inicializar stemmer para inglés
+# Stemmer en inglés
 stemmer = SnowballStemmer("english")
 
 def tokenize_and_stem(text: str):
-    # Pasar a minúsculas
+    """Convierte texto en stems normalizados (minúsculas, sin símbolos)."""
     text = text.lower()
-    # Eliminar caracteres no alfabéticos
     text = re.sub(r'[^a-z\s]', ' ', text)
-    # Tokenizar (palabras con longitud > 1)
     tokens = [t for t in text.split() if len(t) > 1]
-    # Aplicar stemming
     stems = [stemmer.stem(t) for t in tokens]
     return stems
 
-if st.button("Calcular TF-IDF y buscar respuesta"):
+# 🎭 Función para generar frases divertidas
+def generate_funny_sentence(word):
+    """Genera una frase humorística para una palabra clave."""
+    templates = [
+        f"When you forget '{word}', imagine a llama trying to spell it with sunglasses 😎.",
+        f"'{word}' once tried to join a rock band, but forgot the lyrics!",
+        f"Never trust a cat that whispers '{word}' at midnight 🐱‍👤.",
+        f"If '{word}' were a snack, it would definitely be extra crunchy 🍪.",
+        f"Remember '{word}' like your Wi-Fi password — you never know when you’ll need it!",
+        f"'{word}' sounds like a superhero that only fights grammar mistakes 🦸‍♂️.",
+        f"Picture '{word}' dancing salsa in your brain every time you study 💃."
+    ]
+    return random.choice(templates)
+
+if st.button("🚀 Calcular TF-IDF y Buscar Respuesta"):
     documents = [d.strip() for d in text_input.split("\n") if d.strip()]
+    
     if len(documents) < 1:
         st.warning("⚠️ Ingresa al menos un documento.")
     else:
@@ -48,50 +61,58 @@ if st.button("Calcular TF-IDF y buscar respuesta"):
             token_pattern=None
         )
 
-        # Ajustar con documentos
         X = vectorizer.fit_transform(documents)
 
-        # Mostrar matriz TF-IDF
+        # 🧮 Mostrar matriz TF-IDF
         df_tfidf = pd.DataFrame(
             X.toarray(),
             columns=vectorizer.get_feature_names_out(),
             index=[f"Doc {i+1}" for i in range(len(documents))]
         )
 
-        st.write("### Matriz TF-IDF (stems)")
-        st.dataframe(df_tfidf.round(3))
+        with st.expander("📊 Ver matriz TF-IDF"):
+            st.dataframe(df_tfidf.round(3))
 
-        # Vector de la pregunta
+        # Calcular similitud con la pregunta
         question_vec = vectorizer.transform([question])
-
-        # Similitud coseno
         similarities = cosine_similarity(question_vec, X).flatten()
 
-        # Documento más parecido
+        # Documento más relevante
         best_idx = similarities.argmax()
         best_doc = documents[best_idx]
         best_score = similarities[best_idx]
 
-        st.write("### Pregunta y respuesta")
-        st.write(f"**Tu pregunta:** {question}")
-        st.write(f"**Documento más relevante (Doc {best_idx+1}):** {best_doc}")
-        st.write(f"**Puntaje de similitud:** {best_score:.3f}")
+        st.write("### 🎯 Resultado")
+        st.success(f"**Documento más relevante:** {best_doc}")
+        st.info(f"📈 Similitud: {best_score:.3f}")
 
-        # Mostrar todas las similitudes
-        sim_df = pd.DataFrame({
-            "Documento": [f"Doc {i+1}" for i in range(len(documents))],
-            "Texto": documents,
-            "Similitud": similarities
-        })
-        st.write("### Puntajes de similitud (ordenados)")
-        st.dataframe(sim_df.sort_values("Similitud", ascending=False))
-
-        # Mostrar coincidencias de stems
+        # Mostrar palabras clave relevantes
         vocab = vectorizer.get_feature_names_out()
         q_stems = tokenize_and_stem(question)
         matched = [s for s in q_stems if s in vocab and df_tfidf.iloc[best_idx].get(s, 0) > 0]
-        st.write("### Stems de la pregunta presentes en el documento elegido:", matched)
 
+        st.write("### 🔑 Palabras clave encontradas")
+        if matched:
+            st.write(", ".join(matched))
+        else:
+            st.write("No se encontraron coincidencias directas en los documentos.")
 
+        # 🎉 Generar frases humorísticas
+        if matched:
+            st.write("### 😂 Frases para recordar las palabras clave:")
+            for m in matched:
+                st.write(f"— {generate_funny_sentence(m)}")
+        else:
+            st.write("Intenta con una pregunta que comparta palabras con tus documentos.")
+
+# 📘 Sección lateral
+st.sidebar.title("ℹ️ Acerca de la app")
+st.sidebar.write("""
+Esta app demuestra cómo funciona **TF-IDF** (Term Frequency - Inverse Document Frequency)
+para encontrar la relevancia de documentos frente a una pregunta.
+
+La sección de frases humorísticas busca fomentar la **recordación emocional y divertida** 
+de los términos clave, usando asociaciones graciosas y visuales 😄.
+""")
 
 
